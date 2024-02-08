@@ -85,7 +85,7 @@ contract EmailSender is AccessControl, ReentrancyGuard {
     string[] memory emails,
     address[] memory wallets,
     address[] memory referrals
-  ) public onlyModeratorAndOwner {
+  ) public onlyModeratorAndOwner nonReentrant {
     require(emails.length > 0, 'emails list is empty');
     require(emails.length == wallets.length, 'Lengths of emails and wallets arrays do not match');
     require(
@@ -113,18 +113,22 @@ contract EmailSender is AccessControl, ReentrancyGuard {
       IERC20 tokenInstance = IERC20(tokenAddress);
       uint256 amount = emailDeposits[email][tokenAddress];
       if (amount > 0) {
-        emailDeposits[email][tokenAddress] = 0;
-        tokenInstance.safeTransfer(wallet, amount);
-        emit PaymentProcessed(keccak256(abi.encodePacked(email)), wallet, tokenAddress, amount);
+        bool result = tokenInstance.transfer(wallet, amount);
+        if(result) {
+          emailDeposits[email][tokenAddress] = 0;
+          emit PaymentProcessed(keccak256(abi.encodePacked(email)), wallet, tokenAddress, amount);
+        }
       }
     }
 
     // Process ETH Payments
     uint256 ethAmount = emailDeposits[email][address(0)];
     if (ethAmount > 0) {
-      emailDeposits[email][address(0)] = 0;
-      wallet.transfer(ethAmount);
-      emit PaymentProcessed(keccak256(abi.encodePacked(email)), wallet, address(0), ethAmount); // Using address(0) as a placeholder for ETH
+      bool result = wallet.send(ethAmount);
+      if(result) {
+        emailDeposits[email][address(0)] = 0;
+        emit PaymentProcessed(keccak256(abi.encodePacked(email)), wallet, address(0), ethAmount); // Using address(0) as a placeholder for ETH
+      }
     }
   }
 
