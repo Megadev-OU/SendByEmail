@@ -231,7 +231,7 @@ contract EmailSender is AccessControl, ReentrancyGuard {
     }
   }
 
-  function reclaimUnclaimedETH(string calldata email) external nonReentrant onlyModeratorAndOwner {
+  function reclaimUnclaimedETH(string calldata email) external nonReentrant onlyModeratorAndOwner payable {
     require(emailToWallet[email] == address(0), 'Email is linked to a wallet');
     require(
       block.timestamp > emailDepositTimestamps[email][address(0)].add(UNCLAIMED_DURATION),
