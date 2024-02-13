@@ -85,7 +85,7 @@ contract EmailSender is AccessControl, ReentrancyGuard {
     string[] memory emails,
     address[] memory wallets,
     address[] memory referrals
-  ) public onlyModeratorAndOwner nonReentrant {
+  ) public onlyModeratorAndOwner nonReentrant payable {
     require(emails.length > 0, 'emails list is empty');
     require(emails.length == wallets.length, 'Lengths of emails and wallets arrays do not match');
     require(
@@ -213,7 +213,7 @@ contract EmailSender is AccessControl, ReentrancyGuard {
   function reclaimUnclaimedTokens(
     string calldata email,
     address token
-  ) external nonReentrant onlyModeratorAndOwner {
+  ) external nonReentrant onlyModeratorAndOwner payable {
     require(emailToWallet[email] == address(0), 'Email is linked to a wallet');
     require(
       block.timestamp > emailDepositTimestamps[email][token].add(UNCLAIMED_DURATION),
@@ -223,10 +223,12 @@ contract EmailSender is AccessControl, ReentrancyGuard {
     uint256 unclaimedAmount = emailDeposits[email][token];
     require(unclaimedAmount > 0, 'No unclaimed tokens for this email and token');
 
-    emailDeposits[email][token] = 0;
-    IERC20(token).safeTransfer(msg.sender, unclaimedAmount);
-
-    emit TokensReclaimed(keccak256(abi.encodePacked(email)), token, unclaimedAmount);
+    
+    bool result=IERC20(token).transfer(msg.sender, unclaimedAmount);
+    if(result) {
+      emit TokensReclaimed(keccak256(abi.encodePacked(email)), token, unclaimedAmount);
+      emailDeposits[email][token] = 0;
+    }
   }
 
   function reclaimUnclaimedETH(string calldata email) external nonReentrant onlyModeratorAndOwner {
@@ -239,10 +241,12 @@ contract EmailSender is AccessControl, ReentrancyGuard {
     uint256 unclaimedAmount = emailDeposits[email][address(0)];
     require(unclaimedAmount > 0, 'No unclaimed ETH for this email');
 
-    emailDeposits[email][address(0)] = 0;
-    payable(msg.sender).transfer(unclaimedAmount);
-
-    emit TokensReclaimed(keccak256(abi.encodePacked(email)), address(0), unclaimedAmount);
+    bool result= payable(msg.sender).send(unclaimedAmount);
+   
+    if(result) {
+      emailDeposits[email][address(0)] = 0;
+      emit TokensReclaimed(keccak256(abi.encodePacked(email)), address(0), unclaimedAmount);
+    }
   }
 
   function calculateTotalAmountTaxes(
